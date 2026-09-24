@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo FIRE - Finansal Özgürlük Simülatörü</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #059669;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen font-sans flex flex-col justify-between selection:bg-emerald-500 selection:text-white antialiased">
+
+    <!-- Ana Konteyner -->
+    <main class="w-full max-w-6xl mx-auto p-4 md:p-8 my-auto">
+        
+        <!-- Kart Gövdesi -->
+        <div class="bg-white rounded-2xl p-6 md:p-8 shadow-xl border border-slate-200/80 space-y-8">
+            
+            <!-- Header Section -->
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-slate-200 pb-6">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                        <span class="text-xs font-semibold tracking-wider text-emerald-700 uppercase">Gelişmiş Risk Analizi</span>
+                    </div>
+                    <h1 class="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Monte Carlo FIRE Simülatörü</h1>
+                    <p class="text-slate-500 text-sm mt-1">Piyasa dalgalanmalarını ve rastgele getiri olasılıklarını simüle edin.</p>
+                </div>
+                
+                <!-- Kriz / Piyasa Senaryo Butonları -->
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="applyPreset(12, 12)" class="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-semibold rounded-lg border border-sky-200 transition-all duration-150 active:scale-95">
+                        Boğa Piyasası
+                    </button>
+                    <button onclick="applyPreset(8, 15)" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition-all duration-150 active:scale-95">
+                        Sakin Piyasa
+                    </button>
+                    <button onclick="applyPreset(5, 25)" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-lg border border-amber-200 transition-all duration-150 active:scale-95">
+                        Yüksek Oynaklık
+                    </button>
+                    <button onclick="applyPreset(2, 20)" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg border border-rose-200 transition-all duration-150 active:scale-95">
+                        Ayı Piyasası
+                    </button>
+                    <button onclick="applyPreset(-2, 35)" class="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold rounded-lg border border-purple-200 transition-all duration-150 active:scale-95">
+                        Sert Kriz Şoku
+                    </button>
+                </div>
+            </div>
+
+            <!-- İçerik Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- Sol Panel: Parametreler (4 Kolon) -->
+                <div class="lg:col-span-4 bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4">
+                    <h2 class="text-base font-semibold text-slate-800 border-b border-slate-200 pb-3 flex items-center justify-between">
+                        <span>Simülasyon Girdileri</span>
+                        <span class="text-xs text-slate-500 font-normal">Reel Değerler</span>
+                    </h2>
+
+                    <!-- Başlangıç Sermayesi -->
+                    <div class="space-y-1">
+                        <label class="flex justify-between text-xs font-medium text-slate-700">
+                            <span>Başlangıç Portföyü</span>
+                            <span id="capitalVal" class="text-emerald-600 font-semibold">100.000 TL</span>
+                        </label>
+                        <input type="range" id="capital" min="0" max="1000000" step="10000" value="100000" class="w-full">
+                    </div>
+
+                    <!-- Aylık Birikim -->
+                    <div class="space-y-1">
+                        <label class="flex justify-between text-xs font-medium text-slate-700">
+                            <span>Aylık Birikim / Katkı</span>
+                            <span id="savingsVal" class="text-emerald-600 font-semibold">6.000 TL</span>
+                        </label>
+                        <input type="range" id="savings" min="1000" max="50000" step="500" value="6000" class="w-full">
+                    </div>
+
+                    <!-- Yıllık Katkı Artış Seçeneği -->
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 space-y-2.5 shadow-sm">
+                        <label class="flex items-center space-x-2.5 cursor-pointer select-none">
+                            <input type="checkbox" id="increaseSavings" class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+                            <span class="text-xs font-medium text-slate-700">Yıllık Katkı Paylarını Arttır</span>
+                        </label>
+                        <div id="savingsGrowthContainer" class="space-y-1 pt-1 opacity-40 pointer-events-none transition-all duration-200">
+                            <label class="flex justify-between text-xs font-medium text-slate-600">
+                                <span>Yıllık Artış Oranı</span>
+                                <span id="savingsGrowthVal" class="text-emerald-600 font-semibold">%5</span>
+                            </label>
+                            <input type="range" id="savingsGrowthRate" min="0" max="20" step="1" value="5" class="w-full" disabled>
+                        </div>
+                    </div>
+
+                    <!-- Ortalama Yıllık Getiri -->
+                    <div class="space-y-1">
+                        <label class="flex justify-between text-xs font-medium text-slate-700">
+                            <span>Beklenen Net Getiri (Yıllık)</span>
+                            <span id="returnVal" class="text-emerald-600 font-semibold">%8</span>
+                        </label>
+                        <input type="range" id="returnRate" min="-10" max="25" step="0.5" value="8" class="w-full">
+                    </div>
+
+                    <!-- Volatilite / Oynaklık -->
+                    <div class="space-y-1">
+                        <label class="flex justify-between text-xs font-medium text-slate-700">
+                            <span>Oynaklık / Volatilite</span>
+                            <span id="volatilityVal" class="text-emerald-600 font-semibold">%15</span>
+                        </label>
+                        <input type="range" id="volatility" min="1" max="50" step="1" value="15" class="w-full">
+                    </div>
+
+                    <!-- Hedef FIRE Rakamı -->
+                    <div class="space-y-1">
+                        <label class="flex justify-between text-xs font-medium text-slate-700">
+                            <span>Hedef FIRE Rakamı</span>
+                            <span id="targetVal" class="text-emerald-600 font-semibold">5.000.000 TL</span>
+                        </label>
+                        <input type="range" id="target" min="1000000" max="20000000" step="500000" value="5000000" class="w-full">
+                    </div>
+
+                    <!-- Simülasyon Süresi -->
+                    <div class="space-y-1">
+                        <label class="flex justify-between text-xs font-medium text-slate-700">
+                            <span>Yatırım Süresi</span>
+                            <span id="yearsVal" class="text-emerald-600 font-semibold">20 Yıl</span>
+                        </label>
+                        <input type="range" id="years" min="5" max="35" step="1" value="20" class="w-full">
+                    </div>
+
+                    <button id="runBtn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-semibold rounded-lg transition duration-150 shadow-md text-sm mt-2">
+                        Simülasyonu Yeniden Çalıştır
+                    </button>
+                </div>
+
+                <!-- Sağ Panel: Sonuçlar & Grafik (8 Kolon) -->
+                <div class="lg:col-span-8 space-y-5 flex flex-col justify-between">
+                    
+                    <!-- KPI Kartları -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-slate-500 text-xs font-medium block mb-1">Hedef Başarı Oranı</span>
+                            <span id="successRate" class="text-2xl font-bold text-emerald-600">%0</span>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-slate-500 text-xs font-medium block mb-1">P50 (Medyan Getiri)</span>
+                            <span id="p50Val" class="text-base font-bold text-slate-900">0 TL</span>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-slate-500 text-xs font-medium block mb-1">P10 (En Kötü %10 Kriz)</span>
+                            <span id="p10Val" class="text-base font-bold text-rose-600">0 TL</span>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-slate-500 text-xs font-medium block mb-1">P90 (En İyi %10 Boğa)</span>
+                            <span id="p90Val" class="text-base font-bold text-sky-600">0 TL</span>
+                        </div>
+                    </div>
+
+                    <!-- Grafik Alanı -->
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 h-[380px] relative flex-1">
+                        <canvas id="simChart"></canvas>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer / Sorumluluk Reddi Notu -->
+    <footer class="w-full max-w-6xl mx-auto px-4 py-6 text-center text-xs text-slate-500 border-t border-slate-200 mt-6">
+        <p class="leading-relaxed">
+            <strong>Yasal Bilgilendirme & Sorumluluk Reddi:</strong> Bu simülasyon, geçmiş piyasa oynaklığı (volatilite) ve Monte Carlo olasılık dağılım modelleri kullanılarak bilgilendirme amacıyla hazırlanmıştır. Burada sunulan veriler enflasyondan arındırılmış tahmini net reel getirileri temsil etmekte olup kesin bir yatırım tavsiyesi veya gelecek garantisi içermez.
+        </p>
+    </footer>
+
+    <!-- JavaScript Mantığı -->
+    <script>
+        // Checkbox kontrolü ile yıllık artış oranının açılıp kapanması (Görsel kayma olmaksızın pürüzsüz geçiş)
+        const increaseCheckbox = document.getElementById('increaseSavings');
+        const growthContainer = document.getElementById('savingsGrowthContainer');
+        const savingsGrowthRateInput = document.getElementById('savingsGrowthRate');
+
+        increaseCheckbox.addEventListener('change', () => {
+            if (increaseCheckbox.checked) {
+                growthContainer.classList.remove('opacity-40', 'pointer-events-none');
+                savingsGrowthRateInput.removeAttribute('disabled');
+            } else {
+                growthContainer.classList.add('opacity-40', 'pointer-events-none');
+                savingsGrowthRateInput.setAttribute('disabled', 'true');
+            }
+            runMonteCarlo();
+        });
+
+        // Box-Muller Dönüşümü (Gauss / Normal Dağılımlı Rastgele Sayı Üretici)
+        function randomNormal(mean, stdDev) {
+            let u1 = Math.random();
+            let u2 = Math.random();
+            while (u1 === 0) u1 = Math.random();
+            let z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+            return z0 * stdDev + mean;
+        }
+
+        function formatTL(val) {
+            return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(val) + ' TL';
+        }
+
+        let chart = null;
+
+        function applyPreset(returnRate, volatility) {
+            document.getElementById('returnRate').value = returnRate;
+            document.getElementById('returnVal').textContent = `%${returnRate}`;
+            document.getElementById('volatility').value = volatility;
+            document.getElementById('volatilityVal').textContent = `%${volatility}`;
+            runMonteCarlo();
+        }
+
+        function runMonteCarlo() {
+            const capital = parseFloat(document.getElementById('capital').value);
+            const monthlySavings = parseFloat(document.getElementById('savings').value);
+            const meanReturn = parseFloat(document.getElementById('returnRate').value) / 100;
+            const volatility = parseFloat(document.getElementById('volatility').value) / 100;
+            const target = parseFloat(document.getElementById('target').value);
+            const years = parseInt(document.getElementById('years').value);
+
+            // Yıllık artış parametreleri
+            const isIncreasing = document.getElementById('increaseSavings').checked;
+            const growthRate = parseFloat(document.getElementById('savingsGrowthRate').value) / 100;
+
+            const numSimulations = 2000;
+            let simulations = [];
+            let successfulSims = 0;
+
+            for (let sim = 0; sim < numSimulations; sim++) {
+                let path = [capital];
+                let currentBalance = capital;
+                let currentAnnualContribution = monthlySavings * 12;
+
+                for (let year = 1; year <= years; year++) {
+                    // Eğer yıllık artış aktifse, ilk yıldan sonraki yıllarda katkı payını artır
+                    if (isIncreasing && year > 1) {
+                        currentAnnualContribution *= (1 + growthRate);
+                    }
+
+                    let randomReturn = randomNormal(meanReturn, volatility);
+                    currentBalance = (currentBalance + currentAnnualContribution) * (1 + randomReturn);
+                    if (currentBalance < 0) currentBalance = 0;
+                    path.push(currentBalance);
+                }
+
+                if (path[path.length - 1] >= target) {
+                    successfulSims++;
+                }
+
+                simulations.push(path);
+            }
+
+            // Yüzdelik dilimleri (Percentile) hesaplama
+            let p10Path = [], p50Path = [], p90Path = [];
+            for (let year = 0; year <= years; year++) {
+                let yearValues = simulations.map(s => s[year]).sort((a, b) => a - b);
+                p10Path.push(yearValues[Math.floor(numSimulations * 0.10)]);
+                p50Path.push(yearValues[Math.floor(numSimulations * 0.50)]);
+                p90Path.push(yearValues[Math.floor(numSimulations * 0.90)]);
+            }
+
+            // Arayüz Metriklerinin Güncellenmesi
+            const successPercentage = ((successfulSims / numSimulations) * 100).toFixed(1);
+            document.getElementById('successRate').textContent = `%${successPercentage}`;
+            document.getElementById('p10Val').textContent = formatTL(p10Path[years]);
+            document.getElementById('p50Val').textContent = formatTL(p50Path[years]);
+            document.getElementById('p90Val').textContent = formatTL(p90Path[years]);
+
+            // Chart.js Veri Yapılandırması
+            const labels = Array.from({ length: years + 1 }, (_, i) => `${i}. Yıl`);
+            const targetLine = Array(years + 1).fill(target);
+
+            if (chart) chart.destroy();
+
+            const ctx = document.getElementById('simChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'P90 (İyimser Boğa Senaryosu)',
+                            data: p90Path,
+                            borderColor: '#0284c7',
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'P50 (Medyan Beklenen Yol)',
+                            data: p50Path,
+                            borderColor: '#059669',
+                            borderWidth: 3,
+                            fill: false,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'P10 (En Kötü %10 / Kriz)',
+                            data: p10Path,
+                            borderColor: '#e11d48',
+                            borderWidth: 2.5,
+                            fill: false,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Hedef FIRE Rakamı',
+                            data: targetLine,
+                            borderColor: '#64748b',
+                            borderWidth: 2,
+                            borderDash: [6, 6],
+                            fill: false,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'top',
+                            labels: { color: '#334155', font: { family: 'Inter', size: 12 }, usePointStyle: true, boxWidth: 8 } 
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#cbd5e1',
+                            borderWidth: 1,
+                            padding: 12,
+                            boxPadding: 4,
+                            usePointStyle: true,
+                            callbacks: {
+                                label: (context) => ` ${context.dataset.label}: ${formatTL(context.raw)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#64748b', font: { family: 'Inter', size: 11 } }, 
+                            grid: { color: '#e2e8f0' } 
+                        },
+                        y: { 
+                            ticks: { 
+                                color: '#64748b',
+                                font: { family: 'Inter', size: 11 },
+                                callback: (val) => (val / 1000000).toFixed(1) + 'M TL' 
+                            }, 
+                            grid: { color: '#e2e8f0' } 
+                        }
+                    }
+                }
+            });
+        }
+
+        // Dinamik Input Etiket Güncellemeleri
+        const inputs = [
+            { id: 'capital', valId: 'capitalVal', format: val => formatTL(val) },
+            { id: 'savings', valId: 'savingsVal', format: val => formatTL(val) },
+            { id: 'savingsGrowthRate', valId: 'savingsGrowthVal', format: val => `%${val}` },
+            { id: 'returnRate', valId: 'returnVal', format: val => `%${val}` },
+            { id: 'volatility', valId: 'volatilityVal', format: val => `%${val}` },
+            { id: 'target', valId: 'targetVal', format: val => formatTL(val) },
+            { id: 'years', valId: 'yearsVal', format: val => `${val} Yıl` }
+        ];
+
+        inputs.forEach(item => {
+            const inputEl = document.getElementById(item.id);
+            const valEl = document.getElementById(item.valId);
+            inputEl.addEventListener('input', () => {
+                valEl.textContent = item.format(inputEl.value);
+                runMonteCarlo();
+            });
+        });
+
+
+        document.getElementById('runBtn').addEventListener('click', runMonteCarlo);        
+        // İlk yüklemede simülasyonu çalıştır
+        runMonteCarlo();
+    </script>
+</body>
+</html>
